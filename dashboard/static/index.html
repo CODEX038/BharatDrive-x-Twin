@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BharatDrive-X Twin</title>
+<style>
+ body{font-family:system-ui,sans-serif;background:#0f1420;color:#e8eaf0;margin:0;padding:16px}
+ h1{font-size:18px;margin:0 0 12px}
+ .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+ .card{background:#1a2130;border-radius:10px;padding:14px}
+ .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#8b93a7;margin:0 0 10px}
+ .big{font-size:34px;font-weight:700}
+ .band{font-size:13px;color:#8b93a7}
+ .row{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;border-bottom:1px solid #232b3d}
+ .tag{font-size:10px;padding:1px 6px;border-radius:8px;background:#2a3348;color:#9aa3ba;margin-left:6px}
+ ul{margin:6px 0;padding-left:18px;font-size:13px}
+ .ok{color:#5bd68a}.warn{color:#f0c24b}.bad{color:#f06a5b}.dim{color:#5c6579}
+ #alertbar{padding:10px 14px;border-radius:10px;margin-bottom:12px;display:none;font-weight:600}
+</style>
+</head>
+<body>
+<h1>BharatDrive-X Twin — live session <span class="tag">research prototype · no vehicle control</span></h1>
+<div id="alertbar"></div>
+<div class="grid">
+ <div class="card"><h2>Driver readiness <span class="tag">estimated</span></h2>
+   <div class="big" id="readiness">–</div><div class="band" id="readiness_band"></div>
+   <div class="row"><span>State</span><b id="dstate">–</b></div>
+   <div class="row"><span>Fatigue risk</span><b id="frisk">–</b></div>
+   <div class="row"><span>Risk trend</span><b id="trend">–</b></div>
+   <div class="row"><span>Reliability</span><b id="rel">–</b></div>
+   <div class="row"><span>EAR / personal thr.</span><b id="ear">–</b></div>
+   <div class="row"><span>PERCLOS-60</span><b id="perclos">–</b></div>
+   <ul id="contrib"></ul></div>
+ <div class="card"><h2>Road <span class="tag">measured + estimated</span></h2>
+   <div class="big" id="complexity">–</div><div class="band">Road Complexity Index</div>
+   <ul id="creasons"></ul>
+   <div class="row"><span>Detections</span><b id="ndet">–</b></div>
+   <ul id="dets"></ul></div>
+ <div class="card"><h2>Simulation <span class="tag">simulated</span></h2>
+   <div class="row"><span>Scenario</span><b id="scen">–</b></div>
+   <div class="row"><span>Recommended</span><b id="reco">–</b></div>
+   <div class="row"><span>Est. risk / confidence</span><b id="rrisk">–</b></div>
+   <ul id="actions"></ul></div>
+ <div class="card"><h2>Journey safety <span class="tag">fused estimate</span></h2>
+   <div class="big" id="jss">–</div><div class="band" id="danger"></div>
+   <ul id="jreasons"></ul>
+   <div class="row"><span>Confidence</span><b id="jconf">–</b></div></div>
+ <div class="card"><h2>Context</h2><ul id="ctx"></ul></div>
+ <div class="card"><h2>System <span class="tag">measured</span></h2>
+   <div class="row"><span>FPS</span><b id="fps">–</b></div>
+   <div class="row"><span>Loop latency</span><b id="lat">–</b></div>
+   <div class="row"><span>Session</span><b id="sess">–</b></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function li(ul,items){ul.innerHTML=(items||[]).map(x=>`<li>${x}</li>`).join('')}
+async function tick(){
+ try{
+  const s=await (await fetch('/api/state')).json();
+  const d=s.driver||{};
+  $('readiness').textContent=d.readiness??'Unknown';
+  $('readiness').className='big '+(d.readiness==null?'dim':d.readiness>=61?'ok':d.readiness>=41?'warn':'bad');
+  $('readiness_band').textContent=d.readiness_band||'';
+  $('dstate').textContent=d.state||'–';
+  $('frisk').textContent=d.fatigue_risk==null?'Unknown':(100*d.fatigue_risk).toFixed(0)+'%';
+  $('trend').textContent=d.risk_trend||'–';
+  $('rel').textContent=d.reliability!=null?(100*d.reliability).toFixed(0)+'% ('+(d.reliability_state||'')+')':'–';
+  $('ear').textContent=(d.ear!=null?d.ear.toFixed(3):'–')+' / '+(d.ear_threshold??'–');
+  $('perclos').textContent=d.perclos_60==null?'insufficient window':(100*d.perclos_60).toFixed(0)+'%';
+  li($('contrib'),d.contributors);
+  const r=s.road||{};
+  $('complexity').textContent=r.complexity??'–';
+  $('complexity').className='big '+(r.complexity>=75?'bad':r.complexity>=55?'warn':'ok');
+  li($('creasons'),r.reasons);
+  $('ndet').textContent=(r.detections||[]).length;
+  li($('dets'),(r.detections||[]).map(x=>`${x.class} ${x.direction} ${(x.distance_m_est!=null)?('~'+x.distance_m_est+' m (est.)'):''} <span class=tag>${x.source}</span>`));
+  const sim=s.simulation||{};
+  $('scen').textContent=sim.scenario||'–';
+  $('reco').textContent=sim.recommended||'–';
+  $('rrisk').textContent=sim.risk!=null?(100*sim.risk).toFixed(0)+'% / '+(sim.confidence||''):'–';
+  li($('actions'),(sim.actions||[]).map(a=>`${a.label}: ${(100*a.risk).toFixed(0)}%`));
+  const j=s.journey||{};
+  $('jss').textContent=j.score??'–';
+  $('jss').className='big '+(j.score==null?'dim':j.score>=65?'ok':j.score>=40?'warn':'bad');
+  $('danger').textContent=j.danger_level?('Danger: '+j.danger_level):'';
+  $('jconf').textContent=j.confidence||'–';
+  li($('jreasons'),j.reasons);
+  li($('ctx'),(s.context||[]).map(c=>`${c.source}: ${c.available?('fresh '+c.freshness_s+'s, conf '+(100*c.confidence).toFixed(0)+'%'):'<span class=dim>unavailable</span>'}`));
+  const sys=s.system||{};
+  $('fps').textContent=sys.fps!=null?sys.fps.toFixed(1):'–';
+  $('lat').textContent=sys.latency_ms!=null?sys.latency_ms.toFixed(0)+' ms':'–';
+  $('sess').textContent=sys.session_id||'–';
+  const ab=$('alertbar'), al=s.alert;
+  if(al&&al.level>0){ab.style.display='block';ab.textContent=`L${al.level} · ${al.text}`;
+   ab.style.background=al.level>=4?'#7a1f14':al.level>=3?'#7a5a14':'#274067';}
+  else ab.style.display='none';
+ }catch(e){}
+}
+setInterval(tick,500);tick();
+</script>
+</body>
+</html>

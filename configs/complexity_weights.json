@@ -1,0 +1,5 @@
+{
+  "vehicle_density": 14, "two_wheeler_density": 14, "pedestrian_density": 14,
+  "animals": 10, "wrong_side": 12, "road_damage": 8, "construction": 6,
+  "narrow_or_unmarked": 8, "zone": 6, "visibility_weather": 8, "speed_factor": 8
+}

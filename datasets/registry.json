@@ -1,0 +1,12 @@
+{
+  "note": "Register every dataset before use. Check licences — most research datasets forbid redistribution/commercial use.",
+  "datasets": [
+    {"name": "UTA-RLDD", "purpose": "drowsiness evaluation (temporal)", "source": "https://sites.google.com/view/utarldd", "license": "research; request access", "split_rule": "subject-independent (LOSO)", "status": "not_downloaded"},
+    {"name": "NTHU-DDD", "purpose": "drowsiness with glasses/night", "source": "request from NTHU CV lab", "license": "research agreement", "split_rule": "subject-independent", "status": "not_downloaded"},
+    {"name": "YawDD", "purpose": "yawn detection", "source": "IEEE DataPort", "license": "research", "split_rule": "subject-independent", "status": "not_downloaded"},
+    {"name": "India Driving Dataset (IDD)", "purpose": "Indian road perception", "source": "https://idd.insaan.iiit.ac.in", "license": "research, registration required", "split_rule": "official split", "status": "not_downloaded"},
+    {"name": "RDD2022", "purpose": "road damage detection", "source": "https://github.com/sekilab/RoadDamageDetector", "license": "check per-country terms", "split_rule": "official split", "status": "not_downloaded"},
+    {"name": "custom_driver_clips", "purpose": "calibration + controlled tests", "source": "self-recorded, consented, see docs/DATA_COLLECTION_GUIDE.md", "license": "own", "split_rule": "GroupKFold by participant", "status": "pending_collection"},
+    {"name": "custom_indian_hazards", "purpose": "fine-tune pothole/auto-rickshaw/cattle classes", "source": "self-collected images", "license": "own", "split_rule": "location-disjoint split", "status": "pending_collection"}
+  ]
+}

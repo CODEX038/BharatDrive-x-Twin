@@ -1,0 +1,91 @@
+{
+ "name": "Wrong-side vehicle",
+ "description": "Oncoming vehicle on ego's side of a market road, pedestrians present.",
+ "twin": {
+  "ego_speed_kmh": 38,
+  "weather": "clear",
+  "friction": 0.7,
+  "road_width_m": 6.5,
+  "lane_marked": false,
+  "lane_count": 2,
+  "zone": "market",
+  "traffic_density": 0.75,
+  "driver_readiness": 60,
+  "fatigue_risk": 0.42,
+  "alt_route_available": true,
+  "alt_route_delay_min": 6,
+  "hazards": [
+   {
+    "class": "wrong_side_vehicle",
+    "distance_m": 60,
+    "rel_speed_ms": 20.0,
+    "direction": "ahead",
+    "lane": "ego",
+    "confidence": 0.9
+   },
+   {
+    "class": "pedestrian",
+    "distance_m": 12,
+    "rel_speed_ms": 0.5,
+    "direction": "left",
+    "lane": "roadside",
+    "confidence": 0.85
+   },
+   {
+    "class": "auto_rickshaw",
+    "distance_m": 20,
+    "rel_speed_ms": 1.0,
+    "direction": "right",
+    "lane": "right",
+    "confidence": 0.9
+   }
+  ]
+ },
+ "road_objects": [
+  {
+   "class": "wrong_side_vehicle",
+   "appears_at": 1,
+   "disappears_at": 15,
+   "box": [
+    0.44,
+    0.4,
+    0.14,
+    0.14
+   ],
+   "distance_m": 60,
+   "rel_speed_ms": 20.0,
+   "direction": "ahead"
+  },
+  {
+   "class": "pedestrian",
+   "appears_at": 0,
+   "disappears_at": 40,
+   "box": [
+    0.1,
+    0.5,
+    0.06,
+    0.2
+   ],
+   "distance_m": 12,
+   "rel_speed_ms": 0.5,
+   "direction": "left"
+  },
+  {
+   "class": "auto_rickshaw",
+   "appears_at": 0,
+   "disappears_at": 40,
+   "box": [
+    0.7,
+    0.48,
+    0.15,
+    0.18
+   ],
+   "distance_m": 20,
+   "rel_speed_ms": 1.0,
+   "direction": "right"
+  }
+ ],
+ "driver_script": {
+  "type": "pre_drowsy"
+ }
+}

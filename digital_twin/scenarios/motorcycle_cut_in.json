@@ -1,0 +1,67 @@
+{
+ "name": "Motorcycle sudden cut-in",
+ "description": "Two-wheeler cuts into ego lane from the left at moderate urban speed.",
+ "twin": {
+  "ego_speed_kmh": 52,
+  "weather": "clear",
+  "friction": 0.7,
+  "road_width_m": 7.0,
+  "lane_marked": true,
+  "lane_count": 2,
+  "traffic_density": 0.55,
+  "driver_readiness": 68,
+  "fatigue_risk": 0.35,
+  "alt_route_available": false,
+  "hazards": [
+   {
+    "class": "motorcycle",
+    "distance_m": 18,
+    "rel_speed_ms": 4.0,
+    "direction": "left",
+    "lane": "left",
+    "confidence": 0.92
+   },
+   {
+    "class": "car",
+    "distance_m": 30,
+    "rel_speed_ms": 0.5,
+    "direction": "ahead",
+    "lane": "ego",
+    "confidence": 0.9
+   }
+  ]
+ },
+ "road_objects": [
+  {
+   "class": "motorcycle",
+   "appears_at": 2,
+   "disappears_at": 30,
+   "box": [
+    0.15,
+    0.55,
+    0.12,
+    0.18
+   ],
+   "distance_m": 18,
+   "rel_speed_ms": 4.0,
+   "direction": "left"
+  },
+  {
+   "class": "car",
+   "appears_at": 0,
+   "disappears_at": 60,
+   "box": [
+    0.45,
+    0.45,
+    0.18,
+    0.2
+   ],
+   "distance_m": 30,
+   "rel_speed_ms": 0.5,
+   "direction": "ahead"
+  }
+ ],
+ "driver_script": {
+  "type": "pre_drowsy"
+ }
+}

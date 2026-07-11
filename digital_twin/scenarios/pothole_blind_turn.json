@@ -1,0 +1,68 @@
+{
+ "name": "Pothole after blind turn",
+ "description": "Large pothole in ego lane just past a blind turn on a narrow wet road.",
+ "twin": {
+  "ego_speed_kmh": 45,
+  "weather": "wet_road",
+  "friction": 0.45,
+  "road_width_m": 5.5,
+  "lane_marked": false,
+  "lane_count": 1,
+  "traffic_density": 0.3,
+  "driver_readiness": 55,
+  "fatigue_risk": 0.5,
+  "alt_route_available": true,
+  "alt_route_delay_min": 4,
+  "hazards": [
+   {
+    "class": "pothole",
+    "distance_m": 25,
+    "rel_speed_ms": 12.5,
+    "direction": "ahead",
+    "lane": "ego",
+    "confidence": 0.8
+   },
+   {
+    "class": "motorcycle",
+    "distance_m": 15,
+    "rel_speed_ms": -1.0,
+    "direction": "left",
+    "lane": "left",
+    "confidence": 0.85
+   }
+  ]
+ },
+ "road_objects": [
+  {
+   "class": "pothole",
+   "appears_at": 1,
+   "disappears_at": 20,
+   "box": [
+    0.48,
+    0.75,
+    0.1,
+    0.06
+   ],
+   "distance_m": 25,
+   "rel_speed_ms": 12.5,
+   "direction": "ahead"
+  },
+  {
+   "class": "motorcycle",
+   "appears_at": 0,
+   "disappears_at": 40,
+   "box": [
+    0.2,
+    0.5,
+    0.1,
+    0.15
+   ],
+   "distance_m": 15,
+   "rel_speed_ms": -1.0,
+   "direction": "left"
+  }
+ ],
+ "driver_script": {
+  "type": "drowsy_onset"
+ }
+}

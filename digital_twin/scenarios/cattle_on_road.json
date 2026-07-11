@@ -1,0 +1,45 @@
+{
+ "name": "Cattle on road",
+ "description": "Cattle standing in ego lane on a rural road, evening light.",
+ "twin": {
+  "ego_speed_kmh": 48,
+  "weather": "night",
+  "friction": 0.7,
+  "road_width_m": 6.0,
+  "lane_marked": false,
+  "lane_count": 1,
+  "traffic_density": 0.15,
+  "driver_readiness": 72,
+  "fatigue_risk": 0.3,
+  "alt_route_available": false,
+  "hazards": [
+   {
+    "class": "cattle",
+    "distance_m": 45,
+    "rel_speed_ms": 13.3,
+    "direction": "ahead",
+    "lane": "ego",
+    "confidence": 0.88
+   }
+  ]
+ },
+ "road_objects": [
+  {
+   "class": "cattle",
+   "appears_at": 1,
+   "disappears_at": 25,
+   "box": [
+    0.42,
+    0.55,
+    0.2,
+    0.25
+   ],
+   "distance_m": 45,
+   "rel_speed_ms": 13.3,
+   "direction": "ahead"
+  }
+ ],
+ "driver_script": {
+  "type": "alert"
+ }
+}
