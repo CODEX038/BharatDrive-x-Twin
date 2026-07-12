@@ -100,13 +100,23 @@ class MockDetector(ObjectDetector):
         return out
 
 
+# Custom fine-tuned model classes → project classes.
+# The IDD-Lite pilot model (2026-07, mAP50 0.588) is coarse: living_thing/vehicle.
+# Replace with fine-grained mapping once trained on IDD Detection.
+_CUSTOM_MAP = {"living_thing": "pedestrian", "vehicle": "car"}
+_CUSTOM_WEIGHTS = Path(__file__).resolve().parent.parent / "models" / "indian_hazards.pt"
+
+
 class YoloDetector(ObjectDetector):
-    """Ultralytics YOLO (optional). Fine-tuned Indian-class weights can replace the
-    default model via models/indian_hazards.pt."""
+    """Ultralytics YOLO (optional). Auto-prefers fine-tuned Indian weights at
+    models/indian_hazards.pt when present; falls back to pretrained yolov8n."""
     name = "yolo"
 
-    def __init__(self, weights: str = "yolov8n.pt", conf: float = 0.35) -> None:
+    def __init__(self, weights: Optional[str] = None, conf: float = 0.35) -> None:
         from ultralytics import YOLO
+        if weights is None:
+            weights = str(_CUSTOM_WEIGHTS) if _CUSTOM_WEIGHTS.exists() else "yolov8n.pt"
+        log.info("YoloDetector loading weights: %s", weights)
         self.model = YOLO(weights)
         self.conf = conf
 
@@ -116,7 +126,7 @@ class YoloDetector(ObjectDetector):
         out: List[Detection] = []
         for b in res.boxes:
             raw = self.model.names[int(b.cls)]
-            cls = _COCO_MAP.get(raw)
+            cls = _COCO_MAP.get(raw) or _CUSTOM_MAP.get(raw)
             if cls is None:
                 continue
             x1, y1, x2, y2 = [float(v) for v in b.xyxy[0]]
