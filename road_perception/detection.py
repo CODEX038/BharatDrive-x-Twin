@@ -101,8 +101,9 @@ class MockDetector(ObjectDetector):
 
 
 # Custom fine-tuned model classes → project classes.
-# The IDD-Lite pilot model (2026-07, mAP50 0.588) is coarse: living_thing/vehicle.
-# Replace with fine-grained mapping once trained on IDD Detection.
+# Current model (2026-07-12, IDD Detection + RDD2022, mAP50 0.442) emits project
+# class names directly; identity fallback below handles them. This map only
+# covers legacy/alternate names.
 _CUSTOM_MAP = {"living_thing": "pedestrian", "vehicle": "car"}
 _CUSTOM_WEIGHTS = Path(__file__).resolve().parent.parent / "models" / "indian_hazards.pt"
 
@@ -126,7 +127,8 @@ class YoloDetector(ObjectDetector):
         out: List[Detection] = []
         for b in res.boxes:
             raw = self.model.names[int(b.cls)]
-            cls = _COCO_MAP.get(raw) or _CUSTOM_MAP.get(raw)
+            cls = _COCO_MAP.get(raw) or _CUSTOM_MAP.get(raw) or \
+                (raw if raw in HAZARD_BASE else None)
             if cls is None:
                 continue
             x1, y1, x2, y2 = [float(v) for v in b.xyxy[0]]
