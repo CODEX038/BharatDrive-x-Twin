@@ -86,7 +86,12 @@ class FatigueSignature:
             if len(buf) < self.min_samples:
                 continue
             med = statistics.median(buf)
-            mad = _mad(buf, med) or 1e-6
+            # Floor the spread relative to the median. A hyper-stable calibration
+            # window collapses MAD toward zero, which turned tiny, perfectly
+            # normal fluctuations into runaway z-scores — pinning the aggregate
+            # "baseline deviation" at 100% every frame and inflating resting risk.
+            # An 8% relative floor keeps deviations meaningful without exploding.
+            mad = max(_mad(buf, med), 0.08 * abs(med), 1e-6)
             baseline[name] = BaselineFeature(round(med, 4), round(mad, 4), len(buf))
             v = current.get(name)
             if v is None:

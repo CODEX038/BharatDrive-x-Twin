@@ -75,3 +75,68 @@ Per-class (P / R / mAP50 / mAP50-95):
   deliberate choice for laptop deployment.
 - speed_breaker, waterlogging, open_manhole, wrong_side_vehicle remain undetected
   classes (no training data yet).
+
+---
+
+## 2026-07-13 — Driver-monitoring alert calibration (live, MediaPipe backend)
+
+Investigated false alerts observed in live runs: an awake driver was tripping
+repeated L4 CRITICAL alarms. Root-caused across the alert → forecaster → state
+machine → feature-detector chain and fixed the clear defects; measured the
+residual behaviour over four live self-test sessions (single subject, laptop
+webcam, i7-14650HX, MediaPipe FaceMesh backend, no `face_recognition`).
+
+### Defects found and fixed
+
+| # | Defect | Fix | File |
+|---|---|---|---|
+| 1 | L4 message claimed "an immediate road hazard" in driver-only mode, where `max_hazard` is always 0 | Split into `critical_fatigue` message; only claim a hazard when one is present | `alerts/languages.py`, `alerts/manager.py::level_for` |
+| 2 | `CRITICAL` was an immediate (zero-dwell) transition; a single ~1 s eye closure fired L4 | Added `critical_dwell_s` (0.6 s) confirmation window | `driver_monitoring/state_machine.py`, `app/config.py` |
+| 3 | Baseline learning froze whenever `risk ≥ 0.4` — circular, since a bad baseline inflates risk and then locks itself | Gate freezing on objective evidence (microsleep / PERCLOS ≥ 25%) | `driver_monitoring/pipeline.py` |
+| 4 | Robust z-score used `MAD or 1e-6`; a hyper-stable 30 s baseline collapsed MAD → "baseline deviation" pinned at 100% every frame | Floor MAD at 8% of the feature median | `driver_monitoring/fatigue_signature.py::compare` |
+| 5 | Geometric head-pitch jitter fabricated "head-nod" events while the driver sat still | Smooth pitch (EWMA) + require the down phase to persist `min_down_s` (0.35 s) | `driver_monitoring/head_pose.py` |
+
+(Note: a prior session also confirmed the calibration-timing guard — `calibrated`
+now requires ≥ 30 s elapsed **and** ≥ 40 samples, not samples alone, so the
+baseline is no longer captured during ~3 s of camera warmup.)
+
+### Measured effect (live self-test sessions)
+
+| Session | Fixes active | Avg risk | Max risk | DROWSY+CRITICAL frames | L4 alerts | Top inflators |
+|---|---|---|---|---|---|---|
+| `3d5246e9` | alert-logic only | 0.461 | 0.927 | ~51% | 1 | (not logged) |
+| `d60b44b0` | + diagnostics | 0.189 | 0.846 | 0% | 0 | baseline-dev 100%, blink 1203 ms |
+| `2e68be29` | + MAD floor | 0.424 | 0.878 | ~24% | 1 | long blinks, head-nods, baseline-dev (now graded) |
+| `75e9bac6` | + nod fix | 0.340 | 0.647 | 0% | 0 | baseline drift, 1 yawn/5 min, EAR trending down |
+
+Alert-effectiveness signals moved in the right direction: L4 storms (dozens per
+minute) collapsed to zero under good conditions, max risk fell 0.927 → 0.647, and
+head-nod / long-blink artifacts were largely eliminated.
+
+### Known limitation — residual L2 "fatigue increasing" on an awake driver
+
+Under good lighting the system no longer produces false CRITICAL/DROWSY alerts,
+but it still emits intermittent **L2 CAUTION** ("fatigue indicators increasing")
+on a fully awake driver. This is **not** a detector bug — it is inherent to the
+current fatigue model:
+
+- The risk model is an interpretable **hand-weighted heuristic** (`forecasting.py`)
+  whose weights were set for the **dlib** EAR scale; it runs here on **MediaPipe**,
+  whose EAR distribution differs.
+- The personal baseline is captured over a **30 s window** and then held fixed.
+  Normal relaxation over the following minute drifts EAR downward, which the model
+  scores against the frozen baseline as rising fatigue ("baseline deviation",
+  "eye openness trending down").
+- Behaviour is **sensitive to input quality** — sessions with more movement or
+  face-tracking dropouts (flagged as "camera unreliable") score noticeably higher
+  average risk (0.42) than still, well-lit sessions (0.19).
+
+Practical guidance: calibrate under good lighting, facing the camera with eyes
+open, and wait past the "camera unreliable" warnings before trusting the output.
+
+### Next (not yet done)
+
+1. Faster / rolling baseline adaptation so natural EAR drift is tracked, not read as fatigue.
+2. Re-fit forecaster weights (or a labelled ML model, DESIGN §Phase 10) on the MediaPipe EAR scale.
+3. Yawn window / MAR-threshold review (one yawn currently contributes for a full 5 min).
+4. Report false-alerts-per-hour on a labelled awake-vs-drowsy set, per DESIGN §28.

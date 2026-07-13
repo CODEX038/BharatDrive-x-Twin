@@ -429,8 +429,17 @@ def run_live(cfg: Config, use_dashboard: bool) -> None:
                                    advice="Reduce speed gradually.")
             else:
                 alerts.clear(d.ts)
+            # diagnostic detail: persist WHY the risk is what it is so a session
+            # can be analysed offline (contributors + baseline deviations + features)
+            sig = d.signature
             store.driver_event(d.ts, d.state, d.fatigue_risk, d.readiness, d.reliability,
-                               {"trend": d.risk_trend})
+                               {"trend": d.risk_trend,
+                                "contributors": d.contributors,
+                                "ear": d.ear,
+                                "ear_thr": d.personalized_ear_threshold,
+                                "perclos60": d.perclos.get(60.0),
+                                "baseline_dev": getattr(sig, "deviations", None),
+                                "fatigue_dev": getattr(sig, "fatigue_deviation", None)})
             dstate.update({"driver": {"state": d.state, "readiness": d.readiness,
                                       "readiness_band": d.readiness_band,
                                       "fatigue_risk": d.fatigue_risk,
@@ -450,6 +459,10 @@ def run_live(cfg: Config, use_dashboard: bool) -> None:
                         f"PERCLOS60 {f'{pcl:.0%}' if pcl is not None else '--'}  "
                         f"risk {f'{d.fatigue_risk:.0%}' if d.fatigue_risk is not None else '--'}",
                         (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            # show the signals currently driving the risk (top 2 contributors)
+            why = "  |  ".join(d.contributors[:2]) if d.contributors else "no fatigue signals"
+            cv2.putText(frame, f"why: {why}", (10, 84),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
             cv2.imshow("BharatDrive-X Twin (ESC quits, A acknowledges)", frame)
             k = cv2.waitKey(1) & 0xFF
             if k == 27:
