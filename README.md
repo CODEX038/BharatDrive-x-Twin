@@ -81,6 +81,15 @@ pytest tests/                           # deterministic suite, no camera require
 
 ## 🏗️ Architecture
 
+<div align="center">
+
+<img src="docs/architecture.png" alt="BharatDrive-X Twin architecture — two perception streams (driver + road) fused into a Journey Safety Score and adaptive alerts" width="860">
+
+</div>
+
+<details>
+<summary>Text version of the architecture</summary>
+
 ```
  Driver camera ──► Landmark backends ──► Eye/Blink/Yawn/PERCLOS/Head-pose
  (mediapipe │ face_recognition │ synthetic)        │
@@ -105,6 +114,8 @@ pytest tests/                           # deterministic suite, no camera require
                                                             ▼
                               Live Dashboard · SQLite · Session Reports
 ```
+
+</details>
 
 ---
 
