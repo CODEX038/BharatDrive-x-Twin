@@ -16,3 +16,5 @@ indian_roads_yolo.zip
 runs/
 datasets/processed/
 cctv/
+
+storage/.fuse_hidden*
