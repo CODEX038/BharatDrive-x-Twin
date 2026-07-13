@@ -38,6 +38,7 @@ class FatigueSignature:
         self.max_samples = max_samples
         self._buf: Dict[str, List[float]] = {f: [] for f in _FEATURES}
         self._start_ts: Optional[float] = None
+        self._last_ts: Optional[float] = None
 
     # -- learning ---------------------------------------------------------
     def observe(self, ts: float, features: Dict[str, Optional[float]],
@@ -45,6 +46,7 @@ class FatigueSignature:
         """Add a sample to the baseline. Skipped when unreliable or fatigued."""
         if self._start_ts is None:
             self._start_ts = ts
+        self._last_ts = ts
         if not reliable or suspected_fatigue:
             return
         for name in _FEATURES:
@@ -63,7 +65,13 @@ class FatigueSignature:
 
     @property
     def calibrated(self) -> bool:
-        return len(self._buf["ear"]) >= self.min_samples
+        """Needs enough samples AND enough elapsed time — a 3-second baseline
+        captured during camera warmup is not a baseline."""
+        if len(self._buf["ear"]) < self.min_samples:
+            return False
+        if self._start_ts is None or self._last_ts is None:
+            return False
+        return self._last_ts - self._start_ts >= self.calibration_s
 
     def reset(self) -> None:
         self._buf = {f: [] for f in _FEATURES}
@@ -96,11 +104,12 @@ class FatigueSignature:
                                round(agg, 3), level)
 
     def personalized_ear_threshold(self, universal: float = 0.25) -> float:
-        """Personal closed-eye threshold: fraction of the driver's own open-eye median."""
+        """Personal closed-eye threshold: fraction of the driver's own open-eye
+        median. 0.65 gives headroom against lid-lowering when glancing down."""
         buf = self._buf["ear"]
         if len(buf) < self.min_samples:
             return universal
-        return max(0.12, min(0.35, 0.72 * statistics.median(buf)))
+        return max(0.10, min(0.35, 0.65 * statistics.median(buf)))
 
 
 def _mad(values: List[float], med: Optional[float] = None) -> float:

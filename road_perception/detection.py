@@ -58,6 +58,25 @@ class Detection:
                 "source": self.source}
 
 
+# typical real-world object heights (m) for rough monocular distance estimation
+_TYPICAL_HEIGHT_M = {"pedestrian": 1.7, "car": 1.5, "truck": 3.0, "bus": 3.2,
+                     "motorcycle": 1.4, "scooter": 1.3, "bicycle": 1.4,
+                     "auto_rickshaw": 1.8, "cattle": 1.4, "dog": 0.5,
+                     "parked_truck": 3.0, "stopped_vehicle": 1.5}
+
+
+def estimate_distance_m(cls: str, box_h_frac: float, frame_h_px: int = 720) -> Optional[float]:
+    """Pinhole-style monocular distance ESTIMATE from box height. Assumes focal
+    length ≈ 0.9×frame height (typical dashcam FOV). Coarse by design — always
+    labelled estimated, never presented as exact."""
+    h_m = _TYPICAL_HEIGHT_M.get(cls)
+    if h_m is None or box_h_frac <= 0.015:
+        return None
+    focal = 0.9 * frame_h_px
+    d = h_m * focal / (box_h_frac * frame_h_px)
+    return round(min(d, 150.0), 1)
+
+
 class ObjectDetector:
     name = "base"
 
@@ -113,17 +132,20 @@ class YoloDetector(ObjectDetector):
     models/indian_hazards.pt when present; falls back to pretrained yolov8n."""
     name = "yolo"
 
-    def __init__(self, weights: Optional[str] = None, conf: float = 0.35) -> None:
+    def __init__(self, weights: Optional[str] = None, conf: float = 0.35,
+                 imgsz: int = 640) -> None:
         from ultralytics import YOLO
         if weights is None:
             weights = str(_CUSTOM_WEIGHTS) if _CUSTOM_WEIGHTS.exists() else "yolov8n.pt"
         log.info("YoloDetector loading weights: %s", weights)
         self.model = YOLO(weights)
         self.conf = conf
+        self.imgsz = imgsz  # raise (e.g. 1280) for high/far viewpoints like CCTV
 
     def detect(self, frame_bgr, ts: float) -> List[Detection]:
         h, w = frame_bgr.shape[:2]
-        res = self.model.predict(frame_bgr, conf=self.conf, verbose=False)[0]
+        res = self.model.predict(frame_bgr, conf=self.conf, imgsz=self.imgsz,
+                                 verbose=False)[0]
         out: List[Detection] = []
         for b in res.boxes:
             raw = self.model.names[int(b.cls)]
@@ -135,9 +157,13 @@ class YoloDetector(ObjectDetector):
             box = (x1 / w, y1 / h, (x2 - x1) / w, (y2 - y1) / h)
             cx = box[0] + box[2] / 2
             direction = "left" if cx < 0.35 else "right" if cx > 0.65 else "ahead"
+            hazard = HAZARD_BASE.get(cls, 0.4)
+            # proximity raises hazard: large box or in-path position
+            if box[3] > 0.35 or (direction == "ahead" and box[3] > 0.2):
+                hazard = min(1.0, hazard * 1.3)
             out.append(Detection(cls=cls, confidence=float(b.conf), box=box,
-                                 direction=direction,
-                                 hazard_level=HAZARD_BASE.get(cls, 0.4),
+                                 distance_m=estimate_distance_m(cls, box[3], h),
+                                 direction=direction, hazard_level=hazard,
                                  source="front_camera", ts=ts))
         return out
 
@@ -148,7 +174,7 @@ def get_detector(road_source: str, scenario_path: Optional[Path] = None) -> Obje
     try:
         return YoloDetector()
     except Exception as exc:
-        log.info("YOLO unavailable (%s); using mock detector", exc)
+        log.info("YOLO unavailable (%s); using mock detector (%s)", exc)
         if scenario_path:
             return MockDetector(scenario_path)
         raise RuntimeError("No detector available and no scenario provided")

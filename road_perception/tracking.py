@@ -24,12 +24,23 @@ class Track:
     box: Tuple[float, float, float, float]
     last_ts: float
     history: List[Tuple[float, float]] = field(default_factory=list)  # ts, area
+    dist_history: List[Tuple[float, float]] = field(default_factory=list)  # ts, est. distance m
 
     @property
     def approaching(self) -> bool:
         if len(self.history) < 4:
             return False
         return self.history[-1][1] > self.history[0][1] * 1.15
+
+    def rel_speed_ms(self) -> Optional[float]:
+        """Closing speed ESTIMATE (m/s, + = approaching) from the monocular
+        distance trend over ≥0.8 s. Noisy by nature — treat as an estimate."""
+        pts = self.dist_history
+        if len(pts) < 4 or pts[-1][0] - pts[0][0] < 0.8:
+            return None
+        (t0, d0), (t1, d1) = pts[0], pts[-1]
+        rel = (d0 - d1) / (t1 - t0)
+        return round(max(-30.0, min(30.0, rel)), 1)
 
 
 class IouTracker:
@@ -57,6 +68,15 @@ class IouTracker:
             tr.history.append((ts, det.box[2] * det.box[3]))
             tr.history = [(t, a) for t, a in tr.history if t > ts - 3.0]
             det.track_id = best_id
+            if det.distance_m is not None:
+                tr.dist_history.append((ts, det.distance_m))
+                tr.dist_history = [(t, d) for t, d in tr.dist_history if t > ts - 3.0]
+                if det.rel_speed_ms is None:
+                    rel = tr.rel_speed_ms()
+                    if rel is not None:
+                        det.rel_speed_ms = rel
+                        if rel > 0.3:
+                            det.ttc_s = round(det.distance_m / rel, 1)
             if det.rel_speed_ms is None and tr.approaching:
                 det.hazard_level = min(1.0, det.hazard_level * 1.3)
         self._tracks = {tid: tr for tid, tr in self._tracks.items()

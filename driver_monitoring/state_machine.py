@@ -23,10 +23,14 @@ class StateChange:
 
 class DriverStateMachine:
     def __init__(self, dwell_s: float = 1.5, face_missing_s: float = 2.0,
-                 unresponsive_s: float = 6.0) -> None:
+                 unresponsive_s: float = 6.0, critical_dwell_s: float = 0.6) -> None:
         self.dwell_s = dwell_s
         self.face_missing_s = face_missing_s
         self.unresponsive_s = unresponsive_s
+        # CRITICAL needs a short confirmation window so a single blink or a
+        # momentary sub-second eye closure cannot fire an L4 alarm. A genuine
+        # microsleep keeps re-asserting the hint and confirms within this window.
+        self.critical_dwell_s = critical_dwell_s
         self.state = "CALIBRATING"
         self._candidate: Optional[str] = None
         self._candidate_since: float = 0.0
@@ -38,9 +42,11 @@ class DriverStateMachine:
                camera_ok: bool = True) -> str:
         target = self._target(ts, calibrated, face_found, reliability_state,
                               state_hint, distracted, camera_ok)
-        # immediate (non-dwell) transitions for hard conditions
+        # immediate (non-dwell) transitions for hard conditions. CRITICAL is
+        # deliberately NOT immediate anymore — it uses a short dwell so transient
+        # single-frame microsleep flags cannot trip an L4 alarm.
         immediate = {"CAMERA_ERROR", "FACE_NOT_VISIBLE", "UNRESPONSIVE",
-                     "OBSERVATION_UNRELIABLE", "CALIBRATING", "CRITICAL"}
+                     "OBSERVATION_UNRELIABLE", "CALIBRATING"}
         if target == self.state:
             self._candidate = None
             return self.state
@@ -50,7 +56,8 @@ class DriverStateMachine:
         if self._candidate != target:
             self._candidate, self._candidate_since = target, ts
             return self.state
-        if ts - self._candidate_since >= self.dwell_s:
+        dwell = self.critical_dwell_s if target == "CRITICAL" else self.dwell_s
+        if ts - self._candidate_since >= dwell:
             self._commit(target, ts)
         return self.state
 

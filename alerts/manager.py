@@ -14,6 +14,7 @@ from .languages import msg
 log = logging.getLogger(__name__)
 
 LEVELS = {0: "NORMAL", 1: "INFO", 2: "CAUTION", 3: "HIGH", 4: "CRITICAL"}
+# levels: 0 NORMAL · 1 INFO · 2 CAUTION · 3 HIGH · 4 CRITICAL
 
 
 @dataclass
@@ -69,12 +70,15 @@ class AlertManager:
         self.history: List[AlertEvent] = []
         self._last_fired: Dict[str, float] = {}
         self._active_level = 0
+        self._clear_since: Optional[float] = None
+        self.clear_dwell_s = 4.0  # level must stay calm this long before reset
 
     def raise_alert(self, ts: float, level: int, key: str,
                     risk_before: Optional[float] = None, **fmt) -> Optional[AlertEvent]:
         if level <= 0:
             self.clear(ts)
             return None
+        self._clear_since = None  # situation is active again
         last = self._last_fired.get(key, -1e9)
         escalating = level > self._active_level
         if ts - last < self.cooldown_s and not escalating:
@@ -111,9 +115,17 @@ class AlertManager:
                 break
 
     def clear(self, ts: float) -> None:
-        if self._active_level:
+        """Reset only after the situation stays calm for `clear_dwell_s` —
+        prevents flickering detections from re-triggering escalation."""
+        if not self._active_level:
+            return
+        if self._clear_since is None:
+            self._clear_since = ts
+            return
+        if ts - self._clear_since >= self.clear_dwell_s:
             self.audio.stop()
             self._active_level = 0
+            self._clear_since = None
 
     def effectiveness(self) -> Optional[float]:
         """Mean risk reduction after alerts (None until measurable). Never claimed
@@ -129,8 +141,16 @@ def level_for(state: str, max_hazard: float, reliability_state: str) -> tuple:
     """Map fused situation → (level, message key)."""
     if reliability_state in ("POOR", "UNAVAILABLE"):
         return 2, "unreliable"
-    if state == "CRITICAL" or (state in ("DROWSY", "UNRESPONSIVE") and max_hazard >= 0.7):
-        return 4, "critical"
+    # Fatigue-driven critical and hazard-driven critical are distinct situations.
+    # Only claim a road hazard when one is actually present (max_hazard >= 0.7);
+    # otherwise report severe fatigue alone. In driver-only/live mode max_hazard
+    # is always 0.0, so this prevents the alert from inventing a road hazard.
+    if state == "CRITICAL" and max_hazard >= 0.7:
+        return 4, "critical"                       # severe fatigue AND a real hazard
+    if state in ("DROWSY", "UNRESPONSIVE") and max_hazard >= 0.7:
+        return 4, "critical"                       # fatigued driver into a hazard
+    if state == "CRITICAL":
+        return 4, "critical_fatigue"               # severe fatigue only, no hazard
     if max_hazard >= 0.7:
         return 3, "high_hazard"
     if state in ("PRE_DROWSY", "DROWSY"):

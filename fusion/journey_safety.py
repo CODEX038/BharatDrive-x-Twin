@@ -55,6 +55,14 @@ def compute_journey_safety(*, readiness: Optional[int], fatigue_risk: Optional[f
     if speed_kmh and speed_kmh > 50 and complexity >= 55:
         score -= 8
         reasons.append("Current speed is high for the conditions")
+    # a critical subsystem must dominate — never averaged away by a calm road
+    if readiness is not None and readiness <= 20:
+        score = min(score, 25)
+        reasons.insert(0, "Driver readiness critical — overall safety capped")
+    elif readiness is not None and readiness <= 40:
+        score = min(score, 45)
+    if max_hazard_level >= 0.85:
+        score = min(score, 40)
     score = int(max(0, min(100, round(score))))
 
     danger = ("Critical" if score < 20 else "High" if score < 40

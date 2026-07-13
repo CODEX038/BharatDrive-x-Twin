@@ -34,6 +34,7 @@ class Config:
     calibration_s: float = 30.0
     face_missing_s: float = 2.0
     state_dwell_s: float = 1.5
+    critical_dwell_s: float = 0.6   # confirmation window before committing CRITICAL
     # reliability
     reliability_poor: float = 0.35
     reliability_good: float = 0.65

@@ -11,3 +11,8 @@ models/*.onnx
 *.mp4
 *.avi
 ~$*
+
+indian_roads_yolo.zip
+runs/
+datasets/processed/
+cctv/

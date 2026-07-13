@@ -61,9 +61,11 @@ class DriverMonitor:
         self.signature = FatigueSignature(cfg.calibration_s)
         self.forecaster = FatigueForecaster()
         self.readiness = ReadinessEngine()
-        self.fsm = DriverStateMachine(cfg.state_dwell_s, cfg.face_missing_s)
+        self.fsm = DriverStateMachine(cfg.state_dwell_s, cfg.face_missing_s,
+                                      critical_dwell_s=cfg.critical_dwell_s)
         self._session_start: Optional[float] = None
         self._fps_ts: list = []
+        self._was_calibrated = False
 
     def update(self, frame_bgr, ts: Optional[float] = None) -> DriverFrameResult:
         ts = time.monotonic() if ts is None else ts
@@ -104,9 +106,31 @@ class DriverMonitor:
             baseline_deviation=sig.fatigue_deviation, microsleep=blink.microsleep,
         )
         fc = self.forecaster.predict(snap)
-        # baseline learns only from reliable, non-fatigued observations
+        # Baseline learns only from reliable observations. The "no learning while
+        # fatigued" guard applies only AFTER calibration: during the initial window
+        # we assume the session starts alert (docs/DESIGN.md §4) — otherwise a
+        # backend whose EAR scale differs from the universal threshold (e.g.
+        # MediaPipe vs dlib) can never calibrate out of a false-drowsy deadlock.
+        # Freeze baseline learning only on OBJECTIVE fatigue evidence (ongoing
+        # microsleep or high PERCLOS), never on the model's own risk output.
+        # Gating on fc.risk was circular: a non-representative baseline inflates
+        # risk >= 0.4, which froze the baseline, which kept risk high forever —
+        # a normal, awake driver stayed locked at "fatigued". Objective gating
+        # lets the baseline keep converging to the driver's true resting EAR.
+        perclos_60 = pcl.get(60.0) or 0.0
+        suspected = (self.signature.calibrated
+                     and (blink.microsleep or perclos_60 >= 0.25))
         self.signature.observe(ts, current, reliable and rel.score >= self.cfg.reliability_good,
-                               suspected_fatigue=(fc.reliable and fc.risk >= 0.4))
+                               suspected_fatigue=suspected)
+        # Calibration just completed: pre-calibration blink/PERCLOS samples were
+        # judged with the wrong (universal) threshold — flush them so risk starts
+        # from the personalized baseline, not from contaminated windows.
+        if self.signature.calibrated and not self._was_calibrated:
+            self._was_calibrated = True
+            self.blinks.reset()
+            self.perclos.reset()
+            log.info("personal baseline calibrated (EAR thr %.3f) — event windows reset",
+                     self.signature.personalized_ear_threshold(self.cfg.ear_threshold))
         journey_h = (ts - self._session_start) / 3600.0
         rd = self.readiness.update(ts, fc.risk if fc.reliable else None, rel.score,
                                    distracted=False, looking_away=head.looking_away,
